@@ -21,13 +21,35 @@ func gotWantInt(t *testing.T, got, want int) {
 	}
 }
 
+// stubWriterString
+// to store links url -> html
+type stubWriterString struct {
+	pages map[string]string
+}
+
+func (s *stubWriterString) write(url string) string {
+	return s.pages[url]
+}
+
+///////////////////////////////////////////////////////////
+// TESTS
+
 func TestGetForm(t *testing.T) {
+	form := stubWriterString{
+		map[string]string{
+			"/":         "init form",
+			"/1/coucou": "email form",
+			"/2/toto":   "email validation",
+		},
+	}
+
+	server := &FormServer{&form}
 
 	urlWant := func(t *testing.T, url, want string) {
 		request, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s", url), nil)
 		response := httptest.NewRecorder()
 
-		FormServer(response, request)
+		server.ServeHTTP(response, request)
 
 		got := response.Body.String()
 		gotWantString(t, got, want)
@@ -37,24 +59,12 @@ func TestGetForm(t *testing.T) {
 		urlWant(t, "/", "init form")
 	})
 
-	t.Run("/ URL", func(t *testing.T) {
-		urlWant(t, "/", "init form")
-	})
-
 	t.Run("/1/ URL", func(t *testing.T) {
-		urlWant(t, "/1/qwerq", "email form")
+		urlWant(t, "/1/coucou", "email form")
 	})
 
-}
-
-func TestGetFormStep(t *testing.T) {
-
-	gotWant := func(t *testing.T, got, want step) {
-		gotWantInt(t, int(got), int(want))
-	}
-
-	t.Run("getFormStep /", func(t *testing.T) {
-		gotWant(t, getFormStep("/"), STEP0)
+	t.Run("/2/ URL", func(t *testing.T) {
+		urlWant(t, "/2/toto", "email validation")
 	})
 
 }
