@@ -1,73 +1,91 @@
 package main
 
 import (
+	"crypto/md5"
+	"encoding/json"
 	"fmt"
+	"io"
 	// "log"
 	"net/http"
-	"strings"
+	// "strings"
 )
 
-// = steps for process validation
-// + https://yourbasic.org/golang/iota/
-// const (
-// 	STEP0 step = iota
-// 	STEP1
-// 	STEP2
-// 	STEP_ERROR
-// )
-// func (s step) String() string {
-// 	return [...]string{"Step 0", "Step 1", "Step 2", "Step unknown"}[s]
-// }
-// func getFormStep(url string) step {
-// 	if url == "/" {
-// 		return STEP0
+// Data Model
+type FormModel struct {
+	Nom    string
+	Prenom string
+}
+
+func (f *FormModel) String() string {
+	return fmt.Sprintf("Nom: %s, Prenom: %s", f.Nom, f.Prenom)
+}
+
+func (f *FormModel) getHash() string {
+	h := md5.New()
+	io.WriteString(h, f.String())
+	return string(h.Sum(nil))
+}
+
+// FIXME
+// func (f *FormModel) String() string {
+// 	s, err := json.Marshal(f)
+// 	if err != nil {
+// 		return ""
 // 	}
-// 	if strings.HasPrefix(url, "/1/") {
-// 		return STEP1
-// 	} else if strings.HasPrefix(url, "/2/") {
-// 		return STEP2
-// 	}
-// 	return STEP_ERROR
+// 	return string(s)
 // }
 
 // struct FormServer
+// is a http.Handler !!
 type FormServer struct {
-	form WriterString
-}
-type WriterString interface {
-	write(string) string
+	form GetterForm
+	http.Handler
 }
 
-func (f *FormServer) ServeHTTP(w http.ResponseWriter, request *http.Request) {
-
-	url := request.URL.RequestURI()
-	fmt.Fprint(w, f.form.write(url))
-
+type GetterForm interface {
+	// get html from url
+	GetForm(string) string
+	GetModel() FormModel
 }
-func write(url string) string {
-	switch {
 
-	case url == "":
-		return "init form"
-	case strings.HasPrefix(url, "/1/"):
-		return "email form"
-	case strings.HasPrefix(url, "/2/"):
-		return "valid email form"
-	default:
-		return "42"
+// Constructor
+func NewFormServer(form GetterForm) *FormServer {
+
+	f := new(FormServer)
+	f.form = form
+
+	router := http.NewServeMux()
+
+	router.Handle("/", http.HandlerFunc(f.handle_step0))
+	router.Handle("/forms", http.HandlerFunc(f.handle_json_forms))
+
+	f.Handler = router
+
+	return f
+}
+
+//
+// Handlers
+
+// default
+func (f *FormServer) handle_step0(w http.ResponseWriter, r *http.Request) {
+	url := r.URL.RequestURI()
+	resp := f.form.GetForm(url)
+	if resp == "" {
+		w.WriteHeader(http.StatusNotFound)
 	}
+	fmt.Fprint(w, resp)
 }
 
-// func write(url string) string {
-// 	switch getFormStep(url) {
-
-// 	case STEP0:
-// 		return "init form"
-// 	case STEP1:
-// 		return "email form"
-// 	case STEP2:
-// 		return "valid email form"
-// 	default:
-// 		return "42"
-// 	}
-// }
+// API - json
+// /forms
+func (f *FormServer) handle_json_forms(w http.ResponseWriter, r *http.Request) {
+	// log.Printf(">> handle_json_forms")
+	w.Header().Set("content-type", "application/json")
+	model := f.form.GetModel()
+	// log.Printf("   handle_json_forms/GetModel = %s", model)
+	json.NewEncoder(w).Encode(model)
+	// http: superfluous
+	// w.WriteHeader(http.StatusOK)
+	// log.Printf("<< handle_json_forms")
+}
