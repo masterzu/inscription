@@ -1,73 +1,97 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	// "log"
 	"net/http"
-	"strings"
 )
 
-// = steps for process validation
-// + https://yourbasic.org/golang/iota/
-// const (
-// 	STEP0 step = iota
-// 	STEP1
-// 	STEP2
-// 	STEP_ERROR
-// )
-// func (s step) String() string {
-// 	return [...]string{"Step 0", "Step 1", "Step 2", "Step unknown"}[s]
-// }
-// func getFormStep(url string) step {
-// 	if url == "/" {
-// 		return STEP0
-// 	}
-// 	if strings.HasPrefix(url, "/1/") {
-// 		return STEP1
-// 	} else if strings.HasPrefix(url, "/2/") {
-// 		return STEP2
-// 	}
-// 	return STEP_ERROR
-// }
-
-// struct FormServer
+// FormServer is the HTTP.Handler for the app
 type FormServer struct {
-	form WriterString
-}
-type WriterString interface {
-	write(string) string
+	store Storage
+	http.Handler
 }
 
-func (f *FormServer) ServeHTTP(w http.ResponseWriter, request *http.Request) {
+// Constructor
+func NewFormServer(st Storage) *FormServer {
 
-	url := request.URL.RequestURI()
-	fmt.Fprint(w, f.form.write(url))
+	f := new(FormServer)
+	f.store = st
+	router := http.NewServeMux()
 
+	router.Handle("/", http.HandlerFunc(f.handleStep0))
+	router.Handle("/1/", http.HandlerFunc(f.handleStep1))
+
+	//api
+	router.Handle("/forms", http.HandlerFunc(f.handleJSONForms))
+
+	f.Handler = router
+
+	return f
 }
-func write(url string) string {
-	switch {
 
-	case url == "":
-		return "init form"
-	case strings.HasPrefix(url, "/1/"):
-		return "email form"
-	case strings.HasPrefix(url, "/2/"):
-		return "valid email form"
+//
+// Handlers
+
+// URL = /
+func (f *FormServer) handleStep0(w http.ResponseWriter, r *http.Request) {
+	// debug(">> handleStep0/method: %s", r.Method)
+	aUrl := r.URL.RequestURI()
+	switch r.Method {
+	case "GET":
+		resp := f.store.TemplateFromURL(aUrl)
+		if resp == "" {
+			w.WriteHeader(http.StatusNotFound)
+		}
+		fmt.Fprint(w, resp)
+	case "POST":
+		model, err := ReadFormModel(r.Body)
+		if err != nil {
+			// debug("handleStep0/POST/err=%s", err)
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "")
+			return
+		}
+		hash := model.GetHash()
+		f.store.RecordModel(model, string(hash))
+		fmt.Fprint(w, string(hash))
+
 	default:
-		return "42"
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprint(w, "")
 	}
 }
 
-// func write(url string) string {
-// 	switch getFormStep(url) {
+// URL = /1/
+func (f *FormServer) handleStep1(w http.ResponseWriter, r *http.Request) {
+	// debug(">> handleStep1/method: %s", r.Method)
 
-// 	case STEP0:
-// 		return "init form"
-// 	case STEP1:
-// 		return "email form"
-// 	case STEP2:
-// 		return "valid email form"
-// 	default:
-// 		return "42"
-// 	}
-// }
+	switch r.Method {
+	case "GET":
+		aUrl := r.URL.RequestURI()
+		resp := f.store.TemplateFromURL(aUrl)
+		if resp == "" {
+			w.WriteHeader(http.StatusNotFound)
+		}
+		fmt.Fprint(w, resp)
+
+	case "POST":
+
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprint(w, "")
+	}
+}
+
+// API - json
+// GET /forms
+func (f *FormServer) handleJSONForms(w http.ResponseWriter, r *http.Request) {
+	// debug(">> handleJSONForms")
+	w.Header().Set("content-type", "application/json")
+	model := f.store.GetModel()
+	// debug("   handleJSONForms/GetModel = %s", model)
+	json.NewEncoder(w).Encode(model)
+	// http: superfluous
+	// w.WriteHeader(http.StatusOK)
+	// debug("<< handleJSONForms")
+}
