@@ -1,19 +1,22 @@
 package main
 
 // stub type for devel store
-// FIXME: get a real datas storage
-type stubWriter struct{}
+type inMemoryStorage struct{}
 
-func (s *stubWriter) GetForm(url string) string {
+func (s *inMemoryStorage) TemplateFromURL(url string) string {
 	return "all is LOVE"
 }
-func (s *stubWriter) GetModel() FormModel {
+func (s *inMemoryStorage) GetModel() FormModel {
 	return FormModel{
 		Nom:    "Cao",
 		Prenom: "Patrick",
 	}
 }
 
-func InMemoryStore() *stubWriter {
-	return &stubWriter{}
+func (s *inMemoryStorage) RecordModel(model FormModel, hash string) error {
+	return nil
+}
+
+func NewMemoryStore() *inMemoryStorage {
+	return &inMemoryStorage{}
 }
