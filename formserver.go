@@ -11,31 +11,33 @@ type FormServer struct {
 	store Storage
 	http.Handler
 }
+
 // + https://yourbasic.org/golang/iota/
 // const (
 func NewFormServer(st Storage) *FormServer {
-// 	STEP0 step = iota
+	// 	STEP0 step = iota
 	f := new(FormServer)
 	f.store = st
 	router := http.NewServeMux()
-// 	STEP1
+	// 	STEP1
 	router.Handle("/", http.HandlerFunc(f.handleStep0))
 	router.Handle("/1/", http.HandlerFunc(f.handleStep1))
-// 	STEP2
-// 	STEP_ERROR
+	// 	STEP2
+	// 	STEP_ERROR
 	router.Handle("/forms", http.HandlerFunc(f.handleJSONForms))
-// )
+	// )
 	f.Handler = router
-// func (s step) String() string {
+	// func (s step) String() string {
 	return f
 }
+
 // 	return [...]string{"Step 0", "Step 1", "Step 2", "Step unknown"}[s]
 // }
 // func getFormStep(url string) step {
 // 	if url == "/" {
 // 		return STEP0
 func (f *FormServer) handleStep0(w http.ResponseWriter, r *http.Request) {
-// 	}
+	// 	}
 	aUrl := r.URL.RequestURI()
 	switch r.Method {
 	case "GET":
@@ -53,7 +55,7 @@ func (f *FormServer) handleStep0(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		hash := model.GetHash()
-		f.store.RecordModel(model, string(hash))
+		f.store.RecordModel(model)
 		fmt.Fprint(w, string(hash))
 
 	default:
@@ -64,7 +66,7 @@ func (f *FormServer) handleStep0(w http.ResponseWriter, r *http.Request) {
 
 // func write(url string) string {
 func (f *FormServer) handleStep1(w http.ResponseWriter, r *http.Request) {
-// 	switch getFormStep(url) {
+	// 	switch getFormStep(url) {
 
 	switch r.Method {
 	case "GET":

@@ -13,8 +13,12 @@ func (s *inMemoryStorage) GetModel() FormModel {
 	}
 }
 
-func (s *inMemoryStorage) RecordModel(model FormModel, hash string) error {
+func (s *inMemoryStorage) RecordModel(model FormModel) error {
 	return nil
+}
+
+func (s *inMemoryStorage) GetHashs() map[string]FormModel {
+	return map[string]FormModel{}
 }
 
 func NewMemoryStore() *inMemoryStorage {

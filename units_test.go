@@ -34,268 +34,13 @@ func TestFormModel_GetHash(t *testing.T) {
 			got := tt.form.GetHash()
 			b := md5.Sum([]byte(tt.form.String()))
 			want := b2s(b[:])
-			// debugTest(t, "got=%s want=%s", got, want)
 
+			// debugTest(t, "got=%s want=%s", got, want)
 			assertString(t, got, want)
 
 		})
 	}
 
-}
-
-func TestFormServer_GetResponseAndError(t *testing.T) {
-	// get Stub datas
-	store := stubTestingStorage{
-		map[string]string{
-			"/":         "init store",
-			"/1/coucou": "email store",
-			"/2/coucou": "email validation",
-		},
-		FormModel{},
-		0,
-	}
-	// debugTest(t,"TestTemplateFromURL/store = %s", store)
-	server := NewFormServer(&store)
-
-	tests := []struct {
-		name         string
-		url          string
-		httpCode     int
-		returnString string
-	}{
-		{name: "root URL", url: "/", httpCode: http.StatusOK, returnString: "init store"},
-		{name: "URL step1", url: "/1/coucou", httpCode: http.StatusOK, returnString: "email store"},
-		{name: "URL step2", url: "/2/coucou", httpCode: http.StatusOK, returnString: "email validation"},
-		{name: "URL unknown", url: "/1/qwe", httpCode: http.StatusNotFound, returnString: ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			request, _ := http.NewRequest(http.MethodGet, tt.url, nil)
-			response := httptest.NewRecorder()
-
-			server.ServeHTTP(response, request)
-
-			assertString(t, response.Body.String(), tt.returnString)
-			assertHttpCode(t, response.Code, tt.httpCode)
-		})
-
-	}
-
-}
-
-func TestFormServer_PostResponse(t *testing.T) {
-	// get Stub datas
-	store := stubTestingStorage{
-		map[string]string{
-			"/":         "init store",
-			"/1/coucou": "email store",
-			"/2/coucou": "email validation",
-		},
-		FormModel{Nom: "cao", Prenom: "patrick"},
-		0,
-	}
-	// debugTest(t,"TestTemplateFromURL/store = %s", store)
-	server := NewFormServer(&store)
-
-	tests := []struct {
-		name         string
-		url          string
-		JSONBody     string
-		httpCode     int
-		returnString string
-	}{
-		{
-			"POST",
-			"/",
-			`{"nom": "CAO","prenom": "PATRICK"}`,
-			http.StatusOK,
-			"2234583ac0311592b3188d9f393d1b59",
-		},
-		{
-			"BAD POST",
-			"/",
-			`{"CAO","PATRICK`,
-			http.StatusBadRequest,
-			"",
-		},
-		{
-			"EMPTY POST",
-			"/",
-			``,
-			http.StatusBadRequest,
-			"",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name+"_"+tt.url, func(t *testing.T) {
-			// debugTest(t,"request %s. body='%s'", tt.name, tt.JSONBody)
-			request, _ := http.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.JSONBody))
-			response := httptest.NewRecorder()
-
-			server.ServeHTTP(response, request)
-			// debugTest(t,"response %s. code=%d body=%s", tt.name, response.Code, response.Body.String())
-
-			assertHttpCode(t, response.Code, tt.httpCode)
-			assertString(t, response.Body.String(), tt.returnString)
-		})
-	}
-}
-
-func TestFormServer_RecordFormModel(t *testing.T) {
-	// get Stub datas
-	store := stubTestingStorage{
-		map[string]string{
-			"/":         "init store",
-			"/1/coucou": "email store",
-			"/2/coucou": "email validation",
-		},
-		FormModel{},
-		0,
-	}
-	// debugTest(t,"TestTemplateFromURL/store = %s", store)
-	server := NewFormServer(&store)
-
-	tests := []struct {
-		name          string
-		url           string
-		JSONBody      string
-		httpCode      int
-		spyWriteCalls int
-		newModel      FormModel
-	}{
-		{
-			"POST",
-			"/",
-			`{"nom": "CAO","prenom": "PATRICK"}`,
-			http.StatusOK,
-			1,
-			FormModel{Nom: "CAO", Prenom: "PATRICK"},
-		},
-		{
-			"BAD POST, keep the model",
-			"/",
-			`{"nom": "CAO","prenom": "PATRI`,
-			http.StatusBadRequest,
-			1,
-			FormModel{Nom: "CAO", Prenom: "PATRICK"},
-		},
-		{
-			"POST, modify the model",
-			"/",
-			`{"nom": "Escudier","prenom": "Chloe"}`,
-			http.StatusOK,
-			2,
-			FormModel{Nom: "Escudier", Prenom: "Chloe"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name+"_"+tt.url, func(t *testing.T) {
-			// debugTest(t,"request %s. body='%s'", tt.name, tt.JSONBody)
-			request, _ := http.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.JSONBody))
-			response := httptest.NewRecorder()
-
-			server.ServeHTTP(response, request)
-			// debugTest(t,"response %s. code=%d body=%s", tt.name, response.Code, response.Body.String())
-
-			assertHttpCode(t, response.Code, tt.httpCode)
-			if tt.spyWriteCalls != store.spyWriteCalls {
-				t.Errorf("got %d calls to RecordFormModel want %d", store.spyWriteCalls, tt.spyWriteCalls)
-			}
-			assertFormModel(t, store.GetModel(), tt.newModel)
-			// assertString(t, response.Body.String(), tt.returnString)
-		})
-	}
-}
-
-func TestGetJsonForms(t *testing.T) {
-	t.Skip()
-	// get Stub datas
-	model := FormModel{
-		Nom:    "Cao",
-		Prenom: "Patrick",
-	}
-	// debugTest(t,"TestGetJsonForms/model = %s", model)
-	store := stubTestingStorage{
-		map[string]string{},
-		model,
-		0,
-	}
-	server := NewFormServer(&store)
-
-	tests := []struct {
-		name          string
-		url           string
-		JSONBody      string
-		httpCode      int
-		spyWriteCalls int
-		newModel      FormModel
-	}{
-		{
-			"/forms",
-			"/",
-			`{"nom": "CAO","prenom": "PATRICK"}`,
-			http.StatusOK,
-			1,
-			FormModel{Nom: "CAO", Prenom: "PATRICK"},
-		},
-		{
-			"BAD POST, keep the model",
-			"/",
-			`{"nom": "CAO","prenom": "PATRI`,
-			http.StatusBadRequest,
-			1,
-			FormModel{Nom: "CAO", Prenom: "PATRICK"},
-		},
-		{
-			"POST, modify the model",
-			"/",
-			`{"nom": "Escudier","prenom": "Chloe"}`,
-			http.StatusOK,
-			2,
-			FormModel{Nom: "Escudier", Prenom: "Chloe"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// debugTest(t,"request %s. body='%s'", tt.name, tt.JSONBody)
-			request, _ := http.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.JSONBody))
-			response := httptest.NewRecorder()
-
-			server.ServeHTTP(response, request)
-			// debugTest(t,"response %s. code=%d body=%s", tt.name, response.Code, response.Body.String())
-
-			assertHttpCode(t, response.Code, tt.httpCode)
-			assertContentType(t, response, jsonContentType)
-
-			got, err := ReadFormModel(response.Body)
-			if err != nil {
-				t.Errorf("Unable to parse response from server %q into []FormModel, '%v'", response.Body, err)
-			}
-			assertFormModel(t, got, tt.newModel)
-		})
-	}
-	t.Run("all datas", func(t *testing.T) {
-
-		aUrl := "/forms"
-
-		request, _ := http.NewRequest(http.MethodGet, aUrl, nil)
-		response := httptest.NewRecorder()
-
-		server.ServeHTTP(response, request)
-
-		assertHttpCode(t, response.Code, http.StatusOK)
-		assertContentType(t, response, jsonContentType)
-
-		got, err := ReadFormModel(response.Body)
-		if err != nil {
-			t.Errorf("Unable to parse response from server %q into []FormModel, '%v'", response.Body, err)
-		}
-		assertFormModel(t, got, model)
-	})
 }
 
 func TestFileSystemFormModel(t *testing.T) {
@@ -350,6 +95,176 @@ func TestFileSystemFormModel(t *testing.T) {
 	})
 
 }
+func TestFormServer_GetResponseAndError(t *testing.T) {
+	// get Stub datas
+	store := stubTestingStorage{
+		map[string]string{
+			"/":         "init store",
+			"/1/coucou": "email store",
+			"/2/coucou": "email validation",
+		},
+		FormModel{},
+		0,
+		map[string]FormModel{},
+	}
+	// debugTest(t,"TestTemplateFromURL/store = %s", store)
+	server := NewFormServer(&store)
+
+	tests := []struct {
+		name         string
+		url          string
+		httpCode     int
+		returnString string
+	}{
+		{name: "root URL", url: "/", httpCode: http.StatusOK, returnString: "init store"},
+		{name: "URL step1", url: "/1/coucou", httpCode: http.StatusOK, returnString: "email store"},
+		{name: "URL step2", url: "/2/coucou", httpCode: http.StatusOK, returnString: "email validation"},
+		{name: "URL unknown", url: "/1/qwe", httpCode: http.StatusNotFound, returnString: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request, _ := http.NewRequest(http.MethodGet, tt.url, nil)
+			response := httptest.NewRecorder()
+
+			server.ServeHTTP(response, request)
+
+			assertString(t, response.Body.String(), tt.returnString)
+			assertHttpCode(t, response.Code, tt.httpCode)
+		})
+
+	}
+
+}
+
+func TestFormServer_PostResponse(t *testing.T) {
+	// get Stub datas
+	store := stubTestingStorage{
+		map[string]string{
+			"/":         "init store",
+			"/1/coucou": "email store",
+			"/2/coucou": "email validation",
+		},
+		FormModel{Nom: "cao", Prenom: "patrick"},
+		0,
+		map[string]FormModel{},
+	}
+	// debugTest(t,"TestTemplateFromURL/store = %s", store)
+	server := NewFormServer(&store)
+
+	tests := []struct {
+		name         string
+		url          string
+		JSONBody     string
+		httpCode     int
+		returnString string
+	}{
+		{
+			"POST",
+			"/",
+			`{"nom": "CAO","prenom": "PATRICK"}`,
+			http.StatusOK,
+			"8ff74764ddedaa020238f31aaf871b22",
+		},
+		{
+			"BAD POST",
+			"/",
+			`{"CAO","PATRICK`,
+			http.StatusBadRequest,
+			"",
+		},
+		{
+			"EMPTY POST",
+			"/",
+			``,
+			http.StatusBadRequest,
+			"",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+"_"+tt.url, func(t *testing.T) {
+			// debugTest(t,"request %s. body='%s'", tt.name, tt.JSONBody)
+			request, _ := http.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.JSONBody))
+			response := httptest.NewRecorder()
+
+			server.ServeHTTP(response, request)
+			// debugTest(t,"response %s. code=%d body=%s", tt.name, response.Code, response.Body.String())
+
+			assertHttpCode(t, response.Code, tt.httpCode)
+			assertString(t, response.Body.String(), tt.returnString)
+		})
+	}
+}
+
+func TestFormServer_RecordFormModel(t *testing.T) {
+	// get Stub datas
+	store := stubTestingStorage{
+		map[string]string{
+			"/":         "init store",
+			"/1/coucou": "email store",
+			"/2/coucou": "email validation",
+		},
+		FormModel{},
+		0,
+		map[string]FormModel{},
+	}
+	// debugTest(t,"TestTemplateFromURL/store = %s", store)
+	server := NewFormServer(&store)
+
+	tests := []struct {
+		name          string
+		url           string
+		JSONBody      string
+		httpCode      int
+		spyWriteCalls int
+		newModel      FormModel
+	}{
+		{
+			"POST",
+			"/",
+			`{"nom": "CAO","prenom": "PATRICK"}`,
+			http.StatusOK,
+			1,
+			FormModel{Nom: "CAO", Prenom: "PATRICK"},
+		},
+		{
+			"BAD POST, keep the model",
+			"/",
+			`{"nom": "CAO","prenom": "PATRI`,
+			http.StatusBadRequest,
+			1,
+			FormModel{Nom: "CAO", Prenom: "PATRICK"},
+		},
+		{
+			"POST, modify the model",
+			"/",
+			`{"nom": "Escudier","prenom": "Chloe"}`,
+			http.StatusOK,
+			2,
+			FormModel{Nom: "Escudier", Prenom: "Chloe"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+"_"+tt.url, func(t *testing.T) {
+			// debugTest(t,"request %s. body='%s'", tt.name, tt.JSONBody)
+			request, _ := http.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.JSONBody))
+			response := httptest.NewRecorder()
+
+			server.ServeHTTP(response, request)
+
+			// debugTest(t,"response %s. code=%d body=%s", tt.name, response.Code, response.Body.String())
+
+			assertHttpCode(t, response.Code, tt.httpCode)
+			if tt.spyWriteCalls != store.spyWriteCalls {
+				t.Errorf("got %d calls to RecordFormModel want %d", store.spyWriteCalls, tt.spyWriteCalls)
+			}
+			assertFormModel(t, store.GetModel(), tt.newModel)
+			// assertString(t, response.Body.String(), tt.returnString)
+		})
+	}
+}
 
 ///////////////////////////////////////////////////////////
 /// INTEGRATION TESTS
@@ -361,6 +276,7 @@ func TestFormServer_Integration(t *testing.T) {
 		map[string]string{},
 		FormModel{},
 		0,
+		map[string]FormModel{},
 	}
 	// debugTest(t,"TestTemplateFromURL/store = %s", store)
 	server := NewFormServer(&store)
@@ -374,7 +290,7 @@ func TestFormServer_Integration(t *testing.T) {
 
 	t.Run("Record and get model", func(t *testing.T) {
 		// REQ1 : POST with body
-		debugTest(t, "request 1. body='%s'", JSONBody)
+		debugTest(t, "request  1. body='%s'", JSONBody)
 		request, _ := http.NewRequest(http.MethodPost, postURL, strings.NewReader(JSONBody))
 		response := httptest.NewRecorder()
 
@@ -387,7 +303,7 @@ func TestFormServer_Integration(t *testing.T) {
 		// getURL = url.PathEscape(getURL)
 
 		// REQ2 : GET with hash in URL
-		debugTest(t, "request 2. url='%v'", getURL)
+		debugTest(t, "request  2. url='%v'", getURL)
 		request, _ = http.NewRequest(http.MethodGet, getURL, nil)
 		response = httptest.NewRecorder()
 
@@ -445,6 +361,11 @@ func assertContentType(t *testing.T, response *httptest.ResponseRecorder, want s
 	}
 }
 
+var assertContentTypeJSON = func(t *testing.T, response *httptest.ResponseRecorder) {
+	t.Helper()
+	assertContentType(t, response, jsonContentType)
+}
+
 func assertError(t *testing.T, got, want error) {
 	t.Helper()
 	if got != want {
@@ -472,6 +393,7 @@ type stubTestingStorage struct {
 	html          map[string]string
 	model         FormModel
 	spyWriteCalls int
+	hashs         map[string]FormModel
 }
 
 func (s *stubTestingStorage) TemplateFromURL(aUrl string) string {
@@ -488,8 +410,13 @@ func (s *stubTestingStorage) GetModel() FormModel {
 	return s.model
 }
 
-func (s *stubTestingStorage) RecordModel(model FormModel, hash string) error {
+func (s *stubTestingStorage) RecordModel(model FormModel) error {
 	s.spyWriteCalls++
 	s.model = model
 	return nil
+}
+
+func (s *stubTestingStorage) GetHashs() map[string]FormModel {
+	// debug(">> GetHashs()")
+	return s.hashs
 }

@@ -14,6 +14,7 @@ import (
 type FormModel struct {
 	Nom    string
 	Prenom string
+	Email  string
 }
 
 func ReadFormModel(r io.Reader) (FormModel, error) {
@@ -27,7 +28,7 @@ func ReadFormModel(r io.Reader) (FormModel, error) {
 }
 
 func (f *FormModel) String() string {
-	return fmt.Sprintf("Nom: %s, Prenom: %s", f.Nom, f.Prenom)
+	return fmt.Sprintf("Nom: %s, Prenom: %s, Email: %s", f.Nom, f.Prenom, f.Email)
 }
 
 // GetHash return the calculated hash from model
@@ -53,11 +54,14 @@ type Storage interface {
 	// TemplateFromURL return a HTML template from a url
 	TemplateFromURL(string) string
 
-	// GetModel return a model from internal state
+	// GetModel the current model
 	GetModel() FormModel
 
-	//RecordModel store model with a hash
-	RecordModel(FormModel, string) error
+	//RecordModel store model
+	RecordModel(FormModel) error
+
+	// GetHashs return all hash saved
+	GetHashs() map[string]FormModel
 }
 
 ///////////////////////////////////////////////////////////
